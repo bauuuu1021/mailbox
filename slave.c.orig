@@ -1,0 +1,152 @@
+#include "slave.h"
+#include <stdio.h>
+#include <fcntl.h>
+
+struct mail_t mail;
+
+int main(int argc, char **argv)
+{
+	printf("exec success\n");
+
+	struct mail_t mail;
+	int fd=open("/sys/kernel/hw2/mailbox",O_RDWR);
+	if (fd==-1)
+		printf("fd error\n");
+	receive_from_fd(fd,&mail);
+	/*
+		char dir[100];  //store what file to open
+		char word[32];  //store what word to find
+		char temp[32];  //store what word just be read in
+		snprintf(word,32,"apple");
+		snprintf(dir,50,"test.txt");
+	*/
+	int count=0;
+	char temp[32];
+	FILE * fp=fopen(mail.file_path,"r");
+	if (fp)
+		printf("file open seccess\n");
+	else
+		printf("file open failed\n");
+
+	while ( fscanf(fp,"%s ", temp)!= EOF)
+		if (!strcmp(temp,mail.data.query_word))     //compare two string
+			count++;
+
+	mail.data.word_count=count;
+	printf("count=%d\n",mail.data.word_count);
+
+    //send to kernel
+    send_to_fd(fd,&mail);
+}
+
+int send_to_fd(int sysfs_fd, struct mail_t *mail)
+{
+
+	//printf("in the sub func\n");
+	//printf("%s\n",mail->data.query_word);
+	//printf("%s\n",mail->file_path);
+
+	char sendBuf[4096];
+	//printf("fd is %d\n",sysfs_fd);
+	//send query_word first
+	memset(sendBuf,0,sizeof(sendBuf));
+	snprintf(sendBuf,sizeof(sendBuf),"q+%s",mail->data.query_word);
+	int ret_val = write(sysfs_fd,sendBuf,sizeof(sendBuf));
+	if (ret_val == ERR_FULL)
+	{
+
+		printf("buffer is full\n");
+
+
+	}
+	else
+	{
+		//  printf("send is successed\n");
+
+	}
+
+	//send word_count result
+	memset(sendBuf,0,sizeof(sendBuf));
+	snprintf(sendBuf,sizeof(sendBuf),"c+%d",mail->data.word_count);
+	ret_val = write(sysfs_fd,sendBuf,sizeof(sendBuf));
+	if (ret_val == ERR_FULL)
+	{
+
+		printf("buffer is full\n");
+
+	}
+	else
+	{
+		//  printf("send is successed\n");
+	}
+
+
+	//then send file_path
+	memset(sendBuf,0,sizeof(sendBuf));
+	snprintf(sendBuf,sizeof(sendBuf),"d+%s",mail->file_path);
+	ret_val = write(sysfs_fd,sendBuf,sizeof(sendBuf));
+	if (ret_val == ERR_FULL)
+	{
+
+		printf("buffer is full\n");
+
+
+	}
+	else
+	{
+		//printf("ret_value is %d \n", ret_val);
+		//  printf("send is successed\n");
+
+	}
+
+
+
+
+}
+
+int receive_from_fd(int sysfs_fd, struct mail_t *mail)
+{
+	//printf("receive_from_fd called\n");
+	//printf("fd is %d\n",sysfs_fd);
+	char buf[100];
+	char correct[100];
+
+	memset(correct,'\0',sizeof(correct));
+	//get the strlen of buf by ret_val
+	int ret_val = read(sysfs_fd,buf,sizeof(buf));
+	/*	printf("error value in receive func = %d\n",ret_val);
+		printf("string from kernel:%s.\n",buf);
+	    strncpy(correct,buf,ret_val);   //copy the correct part (lenth) of buf[] to correct[]
+		printf("is this correct?: %s.\n",out);
+	*/
+
+	if (ret_val == ERR_EMPTY)
+	{
+		printf("nothing to read\n");
+		perror("why can't read");
+	}
+	else
+	{
+		/*
+		 * write something or nothing
+		 */
+	}
+
+
+	//printf("error value in receive func = %d\n",ret_val);
+	printf("string from kernel:%s.\n",buf);
+	strncpy(correct,buf,
+	        ret_val);   //copy the correct part (lenth) of buf[] to correct[]
+	printf("is this correct?:%s.\n",correct);
+
+	//put info. that get from kernel into struct mail_t
+    char empty[3];
+	sscanf(correct,"%s %s %s",mail->data.query_word/*testChar*/,empty,mail->file_path);
+    //mail->data.word_count=atoi(word_count_char);
+	
+    //printf("testChar:%s\n",testChar);
+    //strcpy(mail->data.query_word,testChar);
+    printf("word:%s\n",mail->data.query_word);
+	printf("count:%d\n",mail->data.word_count);
+    printf("path:%s\n",mail->file_path);
+}
